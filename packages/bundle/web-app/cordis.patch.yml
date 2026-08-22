@@ -108,6 +108,21 @@
     - id: cordis-host-runner
       name: '@deepseek-ai/dsh-cordis-host-runner'
 
+    # Lapisan kustom MyAI CODE: gate password + sesi cookie (dipasang ulang dari
+    # fork — upstream tidak menyertakannya). Idle sampai password disimpan via
+    # `dsh --profile web --set-password-stdin`.
+    - id: web-auth
+      name: '@deepseek-ai/dsh-host-web-auth'
+      config:
+        enabled: true
+        cookieName: dsh_web_auth
+        sessionTtlMs: !!js 30 * 24 * 60 * 60 * 1000
+        secureCookie: false
+
+    # Login overlay untuk gate di atas (merender logo MyAI CODE).
+    - id: ui-login-gate
+      name: '@deepseek-ai/dsh-client-ui-login-gate'
+
     # Ordinary provider for the parsed Web flags. Its plugin-level injection
     # waits for cmdlineArgs; no launcher metadata or special row kind is needed.
     - id: web-startup

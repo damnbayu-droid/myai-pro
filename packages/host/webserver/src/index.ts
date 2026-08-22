@@ -55,6 +55,14 @@ export interface WebUpgradeRoute {
   handler: (req: IncomingMessage, socket: Duplex, head: Buffer) => void | Promise<void>
 }
 
+/** Guard decision: allow, or deny with the exact response to send. */
+export type WebGuardDecision =
+  | { allow: true }
+  | { allow: false; status: number; headers: Record<string, string>; body: string }
+
+/** Pre-dispatch guard: inspects one request and returns an allow/deny decision. */
+export type WebGuard = (req: IncomingMessage) => WebGuardDecision | Promise<WebGuardDecision>
+
 /** Gateway config: the listen address. */
 export interface Config {
   /** Listen host; the two supported values are loopback and all-interfaces. */
@@ -81,6 +89,7 @@ export class WebServer extends Service {
   private readonly upgrades = new Map<string, WebUpgradeRoute>()
   private readonly upgradedSockets = new Set<Duplex>()
   private readonly indexTaps: ((html: string) => string)[] = []
+  private readonly guards: WebGuard[] = []
   private fallback: WebRoute['handler'] | undefined
   private server!: Server
   private listenedPort!: number
@@ -112,6 +121,30 @@ export class WebServer extends Service {
     }
     table.set(route.path, route)
     return () => { table.delete(route.path) }
+  }
+
+  /**
+   * Register a pre-dispatch guard, run in registration order before route
+   * matching, upgrade dispatch, and the fallback seat alike. Every registered
+   * guard must allow; the first denial wins and its response is sent verbatim.
+   * @param guard - inspects one request and returns an allow/deny decision.
+   * @returns the disposer removing the guard.
+   */
+  registerGuard(guard: WebGuard): () => void {
+    this.guards.push(guard)
+    return () => {
+      const at = this.guards.indexOf(guard)
+      if (at !== -1) this.guards.splice(at, 1)
+    }
+  }
+
+  /** Run every registered guard against one request; undefined means allowed. */
+  private async runGuards(req: IncomingMessage): Promise<Extract<WebGuardDecision, { allow: false }> | undefined> {
+    for (const guard of this.guards) {
+      const decision = await guard(req)
+      if (!decision.allow) return decision
+    }
+    return undefined
   }
 
   /**
@@ -165,6 +198,12 @@ export class WebServer extends Service {
       /* v8 ignore next -- `?? '/'` arm: node:http always sets url on server
       requests; the field is only optional on the client-side IncomingMessage type */
       const rawPath = new URL(req.url ?? '/', 'http://x').pathname
+      const denied = await this.runGuards(req)
+      if (denied !== undefined) {
+        res.writeHead(denied.status, denied.headers)
+        res.end(denied.body)
+        return
+      }
       const route = this.match(rawPath)
       if (route !== undefined) {
         await route.handler(req, res)
@@ -193,7 +232,13 @@ export class WebServer extends Service {
         res.end()
       })
     })
-    this.server.on('upgrade', (req, socket, head) => {
+    this.server.on('upgrade', async (req, socket, head) => {
+      const denied = await this.runGuards(req)
+      if (denied !== undefined) {
+        socket.end(`HTTP/1.1 ${denied.status} ${denied.status === 401 ? 'Unauthorized' : 'Forbidden'}\r\nContent-Type: ${denied.headers['content-type'] ?? 'text/plain'}\r\nContent-Length: ${Buffer.byteLength(denied.body)}\r\nConnection: close\r\n\r\n${denied.body}`)
+        socket.destroy()
+        return
+      }
       const onError = (error: Error): void => {
         this.ctx.logger.warn(error)
         socket.destroy()
