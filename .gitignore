@@ -40,3 +40,7 @@ worktrees/
 .agents/worktrees/
 .typert-*/
 .ai-memory.toml
+
+# screenshot/critique artifacts — jangan commit
+.critique-shots/
+.impeccable/
