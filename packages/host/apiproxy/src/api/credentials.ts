@@ -41,4 +41,12 @@ export interface CredentialsApi {
    * as `set`. Unsetting an absent reference succeeds (idempotent).
    */
   unset(request: RpcRequest<{ ref: string }>): Promise<RpcResponse<{}>>
+
+  /**
+   * Read one stored credential value back to the client — the explicit
+   * opt-in counterpart of `describe` (which never returns values). Meant for
+   * the account owner reviewing or copying what is stored for a reference;
+   * unconfigured references return an empty value.
+   */
+  get(request: RpcRequest<{ ref: string }>): Promise<RpcResponse<{ value: string }>>
 }

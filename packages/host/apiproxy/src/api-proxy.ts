@@ -3263,6 +3263,22 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         }
         return ok(request, {})
       },
+
+      async get(request) {
+        const credentials = ctx.get('credentials')
+        if (credentials === undefined) return err(request, credentialsAbsent())
+        const { ref } = request.payload
+        try {
+          const hit = await credentials.resolve(credentialRef(ref))
+          return ok(request, { value: hit?.value ?? '' })
+        } catch (error: unknown) {
+          return err(request, {
+            code: 'credential-rejected',
+            message: error instanceof Error ? error.message : String(error),
+            details: { ref },
+          })
+        }
+      },
     },
 
     llm: {

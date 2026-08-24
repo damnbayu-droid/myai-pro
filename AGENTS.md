@@ -2,6 +2,35 @@
 
 DeepSeek Harness is a plugin-based agent harness on vendored Cordis: **everything is a plugin**. Read [docs/architecture.md](docs/architecture.md) before changing `packages/`; follow [docs/AGENTS.md](docs/AGENTS.md) for documentation.
 
+## Safe Edit Protocol (WAJIB, semua sesi, semua model)
+
+Sebelum mengubah file apa pun — di repo ini atau di luar repo ini — baca dan ikuti `~/.dsh/SAFE_EDIT_PROTOCOL.md` (Protokol Pengeditan Aman Master, keputusan LLM Council 24 Agu 2026). Ringkasannya: **backup dulu** (`bash ~/.dsh/backup-state.sh` / `backup-plugins.sh` atau branch git bersih) → **perubahan minimal** → **validasi sintaks** (`node --check` dsb.) → **jalankan cek otomatis** (lint/typecheck/test/build bila ada di package.json) → **review diff** → **verifikasi production** (`web-validate.sh` HARUS VALIDASI OK sebelum restart; verifikasi HTTP 200 setelahnya) → **rollback siap**. Jangan pernah: menyentuh `DSH_WEB_AUTH_*` / `.credentials.yaml` tanpa prosedur darurat, merestart web dari sisi agent, menampilkan rahasia di chat, atau commit langsung ke `main` untuk perubahan besar.
+
+## Claude Mode (tombol "Claude" di composer)
+
+Ketika prompt pengguna diawali `claude: ` (diketik otomatis oleh tombol Claude di samping Chairman), jawablah DENGAN Claude langganan Pro pemilik (bukan model sesi, bukan gateway MyAI OS).
+
+KONTINUITAS SESI (AKTIF): tool `claude_code` mempertahankan SATU sesi Claude Code per sesi chat — panggilan `claude: ` berikutnya MELANJUTKAN percakapan yang sama (Claude ingat konteks & memory dari `claude: ` sebelumnya di sesi chat ini). Jadi:
+- Panggilan `claude: ` PERTAMA dalam sesi chat: seed dengan RANGKUMAN konteks + memory (aturan efisiensi di bawah).
+- Panggilan `claude: ` BERIKUTNYA di sesi chat yang sama: LANGSUNG kirim pertanyaan/tugas baru saja — Claude sudah ingat konteksnya; JANGAN re-summarize (boros kuota).
+
+EFISIENSI TOKEN (WAJIB — kuota langganan Pro terbatas, jangan boros):
+1. RINGKAS, JANGAN DUMP (hanya untuk panggilan pertama / sesi baru). Konteks percakapan dikirim sebagai RANGKUMAN padat (maks ~500 kata), bukan semua pesan. Memory: kirim hanya hasil `memory_search` yang relevan (potong ke butir penting), jangan tempel file memory utuh.
+2. PATH, BUKAN ISI FILE. Untuk tugas yang melibatkan file, kirim PATH file-nya saja — Claude Code punya tool read/grep sendiri; jangan menempel isi file ke prompt (paling boros).
+3. Model default SONNET (hemat di langganan Pro) — jangan pakai Opus kecuali diminta eksplisit.
+4. Untuk tugas ringan (formatting, jawaban singkat), jangan pakai Claude — pakai model sesi (DeepSeek) agar kuota Claude hemat. Claude hanya untuk yang memang butuh dia.
+5. Setelah jawaban: tampilkan sebagai jawaban utama + beri tahu user ini dari Claude langganan Pro. Jangan panggil gateway MyAI OS untuk mode ini.
+
+## Council Mode (Chairman) — WAJIB PARALEL
+
+Ketika prompt pengguna diawali `council: ` (tombol Chairman → Council) atau diminta council:
+
+1. KUMPULKAN paket konteks bersama dari memory (`memory_search` / `memory_read`) — SAMA untuk semua anggota.
+2. Panggil tool `council_member_all` SEKALI dengan `devilAdvocate: true` (default) — tool ini menjalankan SEMUA anggota (DeepSeek, GPT, Claude, Kimi, Gemini, Qwen) secara PARALEL dengan model sungguhan, masing-masing dengan PERAN berbeda (analisis teknis, keputusan, risiko, alternatif, data, implementasi), lalu DeepSeek V4 Pro mengkritik semua jawaban (Devil's Advocate — cari celah, jangan ikut arus).
+3. TAMPILKAN SEMUA hasil (anggota + kritik Devil's Advocate) SEBAGAI SATU BLOK di percakapan — jangan di-render satu per satu.
+4. Lanjut `council_review` (Claude anonim) → tampilkan → `council_chairman` (DeepSeek V4 Pro, menimbang pendapat + kritik) → tampilkan jawaban final.
+5. JANGAN pernah panggil anggota satu per satu kecuali user eksplisit minta satu anggota; mode default = paralel semua + Devil's Advocate aktif.
+
 ## Pre-release stance: foundation over blast radius
 
 **Remove this section at the first tagged release.** With no external consumers, prefer the correct foundation over compatibility shims: rename or repackage freely and update every reference together. Backends reject old on-disk formats. SQLite uses monotonic `SCHEMA_VERSION`; `dsh-session` keeps `SESSION_FORMAT_VERSION` at `0` with no compatibility promise.

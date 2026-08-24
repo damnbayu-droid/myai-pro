@@ -58,7 +58,7 @@ import {
   settingsReplaceValueSchema, settingsUpdateValueSchema,
 } from '../api/settings.schema.ts'
 import {
-  credentialsDescribeValueSchema, credentialsSetValueSchema, credentialsUnsetValueSchema,
+  credentialsDescribeValueSchema, credentialsSetValueSchema, credentialsUnsetValueSchema, credentialsGetValueSchema,
 } from '../api/credentials.schema.ts'
 import { llmDiscoverModelsValueSchema, llmModelsValueSchema, llmProvidersValueSchema } from '../api/llm.schema.ts'
 import {
@@ -155,6 +155,7 @@ export interface IApiClient {
     describe(payload: RequestPayload<'credentials.describe'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'credentials.describe'>>>
     set(payload: RequestPayload<'credentials.set'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'credentials.set'>>>
     unset(payload: RequestPayload<'credentials.unset'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'credentials.unset'>>>
+    get(payload: RequestPayload<'credentials.get'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'credentials.get'>>>
   }
   llm: {
     providers(payload: RequestPayload<'llm.providers'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'llm.providers'>>>
@@ -219,6 +220,7 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'credentials.describe': credentialsDescribeValueSchema,
   'credentials.set': credentialsSetValueSchema,
   'credentials.unset': credentialsUnsetValueSchema,
+  'credentials.get': credentialsGetValueSchema,
   'llm.providers': llmProvidersValueSchema,
   'llm.models': llmModelsValueSchema,
   'llm.discoverModels': llmDiscoverModelsValueSchema,
@@ -492,6 +494,7 @@ export abstract class AbstractApiClient implements IApiClient {
     describe: (payload, signal) => this.callUnary('credentials.describe', payload, signal),
     set: (payload, signal) => this.callUnary('credentials.set', payload, signal),
     unset: (payload, signal) => this.callUnary('credentials.unset', payload, signal),
+    get: (payload, signal) => this.callUnary('credentials.get', payload, signal),
   }
 
   readonly llm: IApiClient['llm'] = {

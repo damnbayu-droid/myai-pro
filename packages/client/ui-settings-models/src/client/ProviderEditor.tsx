@@ -197,6 +197,45 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     return () => { stale = true }
   }, [api.credentials, keyRef])
 
+  // Reveal/copy the stored key on explicit user action — the counterpart of
+  // the write-only field: values only cross the wire on demand.
+  const [revealed, setRevealed] = useState<string | undefined>(undefined)
+  const [copied, setCopied] = useState(false)
+  const fetchStoredKey = async (): Promise<string | undefined> => {
+    const response = await api.credentials.get({ ref: keyRef })
+    return response.result.ok ? response.result.value.value : undefined
+  }
+  const revealKey = async (): Promise<void> => {
+    if (revealed !== undefined) {
+      setRevealed(undefined)
+      return
+    }
+    setBusy(true)
+    setFailure(undefined)
+    try {
+      setRevealed(await fetchStoredKey() ?? '')
+    } catch {
+      setFailure(t('keyRevealFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+  const copyKey = async (): Promise<void> => {
+    setBusy(true)
+    setFailure(undefined)
+    try {
+      const value = revealed ?? await fetchStoredKey()
+      if (value !== undefined && value.length > 0) {
+        await navigator.clipboard.writeText(value)
+        setCopied(true)
+      }
+    } catch {
+      setFailure(t('keyRevealFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const stringAt = (source: unknown, key: string): string | undefined => {
     const value = schema.getPath(source, [key])
     return typeof value === 'string' && value.trim().length > 0 ? value : undefined
@@ -385,6 +424,21 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
             disabled={disabled || keyLocked}
             onChange={(event) => { setKeyDraft(event.target.value) }}
           />
+          {keyState?.configured === true ? (
+            <div className={styles['keyActions']}>
+              <button type="button" className={styles['keyAction']} disabled={disabled}
+                onClick={() => { void revealKey() }}>
+                {revealed === undefined ? t('keyShow') : t('keyHide')}
+              </button>
+              <button type="button" className={styles['keyAction']} disabled={disabled}
+                onClick={() => { void copyKey() }}>
+                {copied ? t('keyCopied') : t('keyCopy')}
+              </button>
+            </div>
+          ) : null}
+          {revealed !== undefined && revealed.length > 0 ? (
+            <p className={styles['revealed']}>{revealed}</p>
+          ) : null}
           {shownKeyFailure === undefined ? null : <p className={styles['error']}>{t(shownKeyFailure)}</p>}
         </div>
         {props.credentialOnly === true ? null : <details className={styles['customized']}>

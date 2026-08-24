@@ -232,7 +232,7 @@ export class WebServer extends Service {
         res.end()
       })
     })
-    this.server.on('upgrade', async (req, socket, head) => {
+    const handleUpgrade = async (req: IncomingMessage, socket: Duplex, head: Buffer): Promise<void> => {
       const denied = await this.runGuards(req)
       if (denied !== undefined) {
         socket.end(`HTTP/1.1 ${denied.status} ${denied.status === 401 ? 'Unauthorized' : 'Forbidden'}\r\nContent-Type: ${denied.headers['content-type'] ?? 'text/plain'}\r\nContent-Length: ${Buffer.byteLength(denied.body)}\r\nConnection: close\r\n\r\n${denied.body}`)
@@ -271,6 +271,14 @@ export class WebServer extends Service {
         this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
         socket.destroy()
       }
+    }
+    // Same last-resort guard as the request handler: a rejecting guard run
+    // logs and drops the socket instead of becoming an unhandled rejection.
+    this.server.on('upgrade', (req, socket, head) => {
+      handleUpgrade(req, socket, head).catch((error: unknown) => {
+        this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
+        socket.destroy()
+      })
     })
 
     await new Promise<void>((resolve, reject) => {

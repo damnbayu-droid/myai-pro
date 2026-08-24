@@ -94,7 +94,6 @@ describe('SidebarRoot shell', () => {
   })
 
   it('renders generic brand fallbacks when no package fills the slots', () => {
-    vi.stubEnv('DSH_CLIENT_COMMIT_HASH', '0123456')
     const { container } = render(<SidebarRoot
       collapsed={false} width={300}
       useSessions={neverHook} useWorkspaces={neverHook}
@@ -103,8 +102,16 @@ describe('SidebarRoot shell', () => {
         options?.fallback ?? null) as SidebarRootComponentProps['renderSlot']}
     />)
 
-    expect(screen.getByText('MyAI CODE')).toBeTruthy()
-    expect(screen.getByText('0123456')).toBeTruthy()
+    // The fallback wordmark is "MyAI CODE" with CODE riding a badge; the
+    // build commit hash is no longer rendered in the brand row. The wordmark
+    // text is split across two spans, so match the fallback element by class
+    // and assert its full textContent (children included).
+    const wordmark = screen.getByText((_, el) =>
+      typeof el?.className === 'string' && el.className.includes('fallbackBrandName'))
+    expect(wordmark.textContent).toContain('MyAI')
+    expect(wordmark.textContent).toContain('CODE')
+    expect(screen.getByText('CODE')).toBeTruthy()
+    expect(screen.queryByText(/[0-9a-f]{7}/)).toBeNull()
     expect(container.querySelector('svg')).not.toBeNull()
   })
 

@@ -2,9 +2,10 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
+import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
 import { WelcomeNotice } from '../src/client/WelcomeNotice.tsx'
 import type { WelcomeNoticeProps } from '../src/client/WelcomeNotice.tsx'
-import { WelcomeNoticeStore } from '../src/client/welcome-store.ts'
+import { WelcomeNoticeStore, type WelcomeSection } from '../src/client/welcome-store.ts'
 import { en, zh } from '../src/client/locales.ts'
 import {
   WELCOME_NOTICE_ACK_FIELD, WELCOME_NOTICE_COPY, WELCOME_NOTICE_SETTINGS_NAMESPACE,
@@ -16,35 +17,50 @@ afterEach(() => {
   document.getElementById('root')?.remove()
 })
 
-function response<T>(value: T) {
-  return { rpcId: 'welcome-rpc' as never, result: { ok: true as const, value } }
-}
-
-function mount(version?: string, mutateImpl: () => Promise<unknown> = () => Promise.resolve(response({}))) {
+/**
+ * A durable-mode welcome scope fake: ready with the given acknowledged version
+ * (or none), and a `set` spy that persists the field unless the test supplies
+ * its own settlement behavior — a settlement that never persists is exactly how
+ * a refused Host write looks to the store.
+ */
+function mount(version?: string, setImpl?: (field: string, value: unknown) => Promise<unknown>) {
   const appRoot = document.createElement('div')
   appRoot.id = 'root'
   document.body.append(appRoot)
-  const mutate = vi.fn(mutateImpl)
-  const api = {
-    settings: {
-      describe: () => Promise.resolve(response({
-        writable: true,
-        hasDocument: false,
-        namespaces: [{
-          ns: WELCOME_NOTICE_SETTINGS_NAMESPACE,
-          schema: {},
-          value: version === undefined ? {} : { [WELCOME_NOTICE_ACK_FIELD]: version },
-          base: {},
-          user: {},
-          applies: 'live' as const,
-          secrets: [],
-          revision: 0,
-        }],
-      })),
-      mutate,
+  let section: WelcomeSection = version === undefined ? {} : { [WELCOME_NOTICE_ACK_FIELD]: version }
+  const listeners = new Set<() => void>()
+  const snapshotOf = (value: WelcomeSection) => ({
+    status: 'ready' as const,
+    value,
+    base: {},
+    user: {},
+    revision: 0 as number | undefined,
+    writable: true,
+    mode: 'host' as const,
+  })
+  let snapshot = snapshotOf(section)
+  const publish = (): void => {
+    snapshot = snapshotOf(section)
+    for (const listener of [...listeners]) listener()
+  }
+  const set = vi.fn(async (field: string, value: unknown): Promise<void> => {
+    if (setImpl !== undefined) {
+      await setImpl(field, value)
+      return
+    }
+    section = { ...section, [field]: value }
+    publish()
+  })
+  const scope: SettingsScope<WelcomeSection> = {
+    getSnapshot: () => snapshot,
+    subscribe: (listener) => { listeners.add(listener); return () => { listeners.delete(listener) } },
+    set,
+    unset: async (field) => {
+      section = Object.fromEntries(Object.entries(section).filter(([key]) => key !== field))
+      publish()
     },
   }
-  const controller = new WelcomeNoticeStore(api as never)
+  const controller = new WelcomeNoticeStore(scope)
   const complete = vi.fn()
   const unusedHook = (() => { throw new Error('unused standard hook') }) as never
   const props: WelcomeNoticeProps = {
@@ -57,7 +73,7 @@ function mount(version?: string, mutateImpl: () => Promise<unknown> = () => Prom
     useWelcome: bindSnapshotSelector(controller.store),
     t: key => zh[key],
   }
-  return { ...render(<WelcomeNotice {...props} />), complete, controller, mutate, appRoot }
+  return { ...render(<WelcomeNotice {...props} />), complete, controller, set, appRoot }
 }
 
 describe('WelcomeNotice', () => {
@@ -94,7 +110,7 @@ describe('WelcomeNotice', () => {
     await screen.findByRole('dialog')
     fireEvent.click(screen.getByRole('button', { name: WELCOME_NOTICE_COPY.zh.continueLabel }))
     await act(async () => { await Promise.resolve() })
-    expect(h.mutate).toHaveBeenCalledOnce()
+    expect(h.set).toHaveBeenCalledOnce()
     expect(h.complete).toHaveBeenCalledOnce()
   })
 

@@ -120,6 +120,7 @@ function scriptedApi(overrides: {
       describe: r => ok(r, { credentials: {} }),
       set: err,
       unset: err,
+      get: err,
       ...overrides.credentials,
     },
     llm: {

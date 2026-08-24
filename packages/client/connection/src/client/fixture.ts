@@ -3032,6 +3032,9 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         fixtureCredentials.set(request.payload.ref, true)
         return ok(request, {})
       },
+      get: request => ok(request, {
+        value: fixtureCredentials.has(request.payload.ref) ? 'fixture-key-' + request.payload.ref : '',
+      }),
       unset: (request) => {
         fixtureCredentials.delete(request.payload.ref)
         return ok(request, {})
@@ -3224,6 +3227,7 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'credentials.describe': return this.api.credentials.describe(request)
       case 'credentials.set': return this.api.credentials.set(request)
       case 'credentials.unset': return this.api.credentials.unset(request)
+      case 'credentials.get': return this.api.credentials.get(request)
       case 'llm.providers': return this.api.llm.providers(request)
       case 'llm.models': return this.api.llm.models(request)
       case 'llm.discoverModels': return this.api.llm.discoverModels(request, signal)
