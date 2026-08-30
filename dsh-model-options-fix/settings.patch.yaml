@@ -1,0 +1,45 @@
+# --- TAMBAHKAN INI ke ~/.dsh/settings.yaml bagian llm-pi-ai.providers ---
+
+# 1) Di provider "qwen-token-plan", setelah entri qwen3.8-max, tambahkan:
+#      models:
+#        - id: qwen3.8-max
+#          name: Qwen 3.8 Max (Token Plan)
+#        - id: qwen3.8-flash          <-- BARU
+#          name: Qwen 3.8 Flash (Token Plan)
+
+# 2) Di provider "qwen-payg", setelah entri qwen3.7-flash, tambahkan:
+#      models:
+#        - id: qwen3.7-flash
+#          name: Qwen 3.7 Flash (Pay as You Go)
+#        - id: qwen3.8-flash          <-- BARU
+#          name: Qwen 3.8 Flash (Pay as You Go)
+
+# 3) Di provider "openrouter", ganti model lama:
+#        - id: stealth/ox-alpha       ->  - id: z-ai/glm-5.3-flash
+#          name: OX Alpha             ->    name: GLM 5.3 Flash (OpenRouter)
+
+# Blok hasil akhir yang diharapkan:
+#     qwen-token-plan:
+#       api: openai-completions
+#       baseURL: https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
+#       models:
+#         - id: qwen3.8-max
+#           name: Qwen 3.8 Max (Token Plan)
+#         - id: qwen3.8-flash
+#           name: Qwen 3.8 Flash (Token Plan)
+#       apiKeyEnv: QWEN_TOKEN_PLAN_API_KEY
+#     qwen-payg:
+#       api: openai-completions
+#       baseURL: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+#       models:
+#         - id: qwen3.7-flash
+#           name: Qwen 3.7 Flash (Pay as You Go)
+#         - id: qwen3.8-flash
+#           name: Qwen 3.8 Flash (Pay as You Go)
+#       apiKeyEnv: QWEN_PAYG_API_KEY
+#     openrouter:
+#       models:
+#         - id: z-ai/glm-5.3-flash
+#           name: GLM 5.3 Flash (OpenRouter)
+#       baseURL: https://openrouter.ai/api/v1
+#       apiKeyEnv: OPENROUTER_API_KEY
