@@ -6,6 +6,10 @@ DeepSeek Harness is a plugin-based agent harness on vendored Cordis: **everythin
 
 Sebelum mengubah file apa pun — di repo ini atau di luar repo ini — baca dan ikuti `~/.dsh/SAFE_EDIT_PROTOCOL.md` (Protokol Pengeditan Aman Master, keputusan LLM Council 24 Agu 2026). Ringkasannya: **backup dulu** (`bash ~/.dsh/backup-state.sh` / `backup-plugins.sh` atau branch git bersih) → **perubahan minimal** → **validasi sintaks** (`node --check` dsb.) → **jalankan cek otomatis** (lint/typecheck/test/build bila ada di package.json) → **review diff** → **verifikasi production** (`web-validate.sh` HARUS VALIDASI OK sebelum restart; verifikasi HTTP 200 setelahnya) → **rollback siap**. Jangan pernah: menyentuh `DSH_WEB_AUTH_*` / `.credentials.yaml` tanpa prosedur darurat, merestart web dari sisi agent, menampilkan rahasia di chat, atau commit langsung ke `main` untuk perubahan besar.
 
+## Batas Workspace (WAJIB, semua sesi, semua model)
+
+**Pekerjaan & setting MyAI Code / DSH jangan pernah mendarat di repo proyek website** (IndonesianVisas, NewsBali, BaliVisas, dst) — bahkan bila workspace sesi DSH kebetulan adalah repo website itu (sesi DSH terikat 1-per-1 ke folder yang dipilih saat sesi dibuat dan tidak bisa diganti di tengah sesi). Semua dokumen, diagnosis, patch, dan catatan config MyAI Code (opsi model di `~/.dsh/settings.yaml`, API keys di `~/.dsh/.credentials.yaml`, MyAI OS Gateway, plugin, hook) → rumahnya repo **myai-pro** ini; config runtime-nya tetap langsung di `~/.dsh/`. Kalau topik sesi website bergeser ke setting MyAI Code: jangan tulis file di repo website — tulis ke `~/.dsh/` (dengan konfirmasi user) atau minta user membuka sesi baru ber-workspace myai-pro. Aturan lengkap: halaman ai-memory `myai-pro/workspace-rules` dan `dsh-model-options-fix/README.md`.
+
 ## Claude Mode (tombol "Claude" di composer)
 
 Ketika prompt pengguna diawali `claude: ` (diketik otomatis oleh tombol Claude di samping Chairman), jawablah DENGAN Claude langganan Pro pemilik (bukan model sesi, bukan gateway MyAI OS).
